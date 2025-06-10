@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import './App.css'
 
+const API_URL = import.meta.env.PROD 
+  ? 'https://loan-calculator-backend.onrender.com'
+  : 'http://127.0.0.1:8000';
+
 function App() {
   const [loanAmount, setLoanAmount] = useState('')
   const [tenureMonths, setTenureMonths] = useState('')
@@ -182,11 +186,14 @@ function App() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/calculate', {
+      console.log('Using API URL:', API_URL); // Debug log
+      const response = await fetch(`${API_URL}/calculate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
+        mode: 'cors',
         body: JSON.stringify({
           loan_amount: parseFloat(loanAmount),
           tenure_months: parseInt(tenureMonths),
@@ -199,44 +206,32 @@ function App() {
             month: parseInt(e.month),
             amount: parseFloat(e.amount)
           }))
-        }),
-      })
+        })
+      });
 
       if (!response.ok) {
-        throw new Error('Failed to calculate loan')
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json()
-      console.log('Response data:', data)
+      const data = await response.json();
+      console.log('Response data:', data); // Debug log
 
       if (data.error) {
-        throw new Error(data.error)
+        throw new Error(data.error);
       }
 
-      setMonthlyEmi(data.monthly_emi)
-      setTotalInterest(data.total_interest)
-      setTotalAmount(data.total_amount)
-      setOriginalLoanAmount(data.original_loan_amount)
-      setSchedule(data.schedule || [])
-      setBaseEmi(data.base_emi)
-      setActualTenure(data.actual_tenure)
-      setShowAdditionalFields(true)
-
-      // Calculate remaining tenure based on the actual schedule length
-      const originalTenure = parseInt(tenureMonths)
-      const actualTenure = data.schedule.length
-      const tenureReduced = originalTenure - actualTenure
-      
-      setSummary({
-        originalLoanAmount: parseFloat(loanAmount),
-        baseEmi: data.base_emi,
-        totalInterest: data.total_interest,
-        totalAmount: data.total_amount,
-        remainingTenure: tenureReduced
-      })
+      setMonthlyEmi(data.base_emi);
+      setTotalInterest(data.total_interest);
+      setTotalAmount(data.total_amount);
+      setOriginalLoanAmount(data.original_loan_amount);
+      setSchedule(data.schedule || []);
+      setBaseEmi(data.base_emi);
+      setActualTenure(data.actual_tenure);
+      setShowAdditionalFields(true);
     } catch (err) {
-      console.error('Error:', err)
-      setError(err.message)
+      console.error('API Error:', err);
+      setError(err.message || 'Failed to calculate EMI. Please try again.');
     }
   }
 

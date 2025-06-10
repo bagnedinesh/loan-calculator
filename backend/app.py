@@ -4,9 +4,11 @@ import math
 import os
 
 app = Flask(__name__)
+
+# Configure CORS
 CORS(app, 
      resources={r"/*": {
-         "origins": ["http://localhost:5173", "https://bagnedinesh.github.io"],
+         "origins": ["http://localhost:5173", "https://bagnedinesh.github.io", "https://bagnedinesh.github.io/loan-calculator"],
          "methods": ["GET", "POST", "OPTIONS"],
          "allow_headers": ["Content-Type", "Authorization"],
          "expose_headers": ["Content-Type", "Authorization"],
@@ -129,5 +131,10 @@ def calculate():
 def health_check():
     return jsonify({"status": "healthy"}), 200
 
+@app.route('/', methods=['GET'])
+def root():
+    return jsonify({"message": "Loan Calculator API is running"}), 200
+
 if __name__ == '__main__':
-    app.run(port=8000, debug=True) 
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port, debug=False) 

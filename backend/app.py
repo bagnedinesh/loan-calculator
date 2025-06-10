@@ -1,15 +1,20 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import math
+import os
 
 app = Flask(__name__)
-CORS(app, resources={
-    r"/*": {
-        "origins": "*",  # Allow all origins during development
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
-    }
-})
+CORS(app, 
+     resources={r"/*": {
+         "origins": ["http://localhost:5173", "https://bagnedinesh.github.io"],
+         "methods": ["GET", "POST", "OPTIONS"],
+         "allow_headers": ["Content-Type", "Authorization"],
+         "expose_headers": ["Content-Type", "Authorization"],
+         "supports_credentials": False,
+         "max_age": 3600
+     }},
+     supports_credentials=False
+)
 
 def calculate_loan(loan_amount, tenure_months, interest_rate, part_payments=None, increased_emis=None):
     # Convert annual interest rate to monthly
@@ -119,6 +124,10 @@ def calculate():
         return jsonify({'error': 'Invalid input values'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
 
 if __name__ == '__main__':
     app.run(port=8000, debug=True) 

@@ -3,7 +3,13 @@ from flask_cors import CORS
 import math
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",  # Allow all origins during development
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 def calculate_loan(loan_amount, tenure_months, interest_rate, part_payments=None, increased_emis=None):
     # Convert annual interest rate to monthly

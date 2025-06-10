@@ -2,21 +2,24 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import math
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
-# Configure CORS
-CORS(app, 
-     resources={r"/*": {
-         "origins": ["http://localhost:5173", "https://bagnedinesh.github.io", "https://bagnedinesh.github.io/loan-calculator"],
-         "methods": ["GET", "POST", "OPTIONS"],
-         "allow_headers": ["Content-Type", "Authorization"],
-         "expose_headers": ["Content-Type", "Authorization"],
-         "supports_credentials": False,
-         "max_age": 3600
-     }},
-     supports_credentials=False
-)
+# Configure CORS with specific origins
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "http://localhost:5173",
+            "https://bagnedinesh.github.io",
+            "https://bagnedinesh.github.io/loan-calculator"
+        ],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 def calculate_loan(loan_amount, tenure_months, interest_rate, part_payments=None, increased_emis=None):
     # Convert annual interest rate to monthly
@@ -92,49 +95,95 @@ def calculate_loan(loan_amount, tenure_months, interest_rate, part_payments=None
         'actual_tenure': len(schedule)
     }
 
-@app.route('/calculate', methods=['POST'])
-def calculate():
+@app.route('/calculate', methods=['POST', 'OPTIONS'])
+def calculate_emi():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
     try:
         data = request.get_json()
-        
-        # Validate required fields
-        required_fields = ['loan_amount', 'tenure_months', 'interest_rate']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
-        
-        # Extract and validate data
-        loan_amount = float(data['loan_amount'])
-        tenure_months = int(data['tenure_months'])
-        interest_rate = float(data['interest_rate'])
-        part_payments = data.get('part_payments', [])
-        increased_emis = data.get('increased_emis', [])
-        
-        # Validate values
-        if loan_amount <= 0:
-            return jsonify({'error': 'Loan amount must be positive'}), 400
-        if tenure_months <= 0:
-            return jsonify({'error': 'Tenure must be positive'}), 400
-        if interest_rate <= 0:
-            return jsonify({'error': 'Interest rate must be positive'}), 400
-        
-        # Calculate loan
-        result = calculate_loan(loan_amount, tenure_months, interest_rate, part_payments, increased_emis)
-        return jsonify(result)
-        
-    except ValueError as e:
-        return jsonify({'error': 'Invalid input values'}), 400
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Extract values with defaults
+        loan_amount = float(data.get('loanAmount', 0))
+        interest_rate = float(data.get('interestRate', 0))
+        loan_term = int(data.get('loanTerm', 0))
+        part_payments = data.get('partPayments', [])
+        emi_increases = data.get('emiIncreases', [])
+
+        # Validate inputs
+        if loan_amount <= 0 or interest_rate <= 0 or loan_term <= 0:
+            return jsonify({"error": "Invalid input values"}), 400
+
+        # Calculate monthly interest rate
+        monthly_rate = interest_rate / 12 / 100
+
+        # Calculate base EMI
+        base_emi = loan_amount * monthly_rate * (1 + monthly_rate)**loan_term / ((1 + monthly_rate)**loan_term - 1)
+
+        # Initialize variables for tracking
+        remaining_principal = loan_amount
+        total_interest = 0
+        total_paid = 0
+        current_emi = base_emi
+        schedule = []
+
+        # Process each month
+        for month in range(1, loan_term + 1):
+            # Calculate interest for this month
+            interest_payment = remaining_principal * monthly_rate
+            
+            # Calculate principal payment
+            principal_payment = current_emi - interest_payment
+            
+            # Check for part payments in this month
+            part_payment = 0
+            for payment in part_payments:
+                if payment['month'] == month:
+                    part_payment += float(payment['amount'])
+            
+            # Check for EMI increases in this month
+            for increase in emi_increases:
+                if increase['month'] == month:
+                    current_emi += float(increase['amount'])
+            
+            # Update principal payment with part payment
+            principal_payment += part_payment
+            
+            # Update totals
+            remaining_principal -= principal_payment
+            total_interest += interest_payment
+            total_paid += principal_payment + interest_payment
+            
+            # Add to schedule
+            schedule.append({
+                'month': month,
+                'emi': round(current_emi, 2),
+                'principal': round(principal_payment, 2),
+                'interest': round(interest_payment, 2),
+                'remaining': round(remaining_principal, 2) if remaining_principal > 0 else 0
+            })
+
+        return jsonify({
+            'base_emi': round(base_emi, 2),
+            'total_interest': round(total_interest, 2),
+            'total_payment': round(total_paid, 2),
+            'schedule': schedule
+        })
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error calculating EMI: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "healthy"}), 200
 
-@app.route('/', methods=['GET'])
-def root():
-    return jsonify({"message": "Loan Calculator API is running"}), 200
+@app.route('/')
+def home():
+    return jsonify({"status": "API is running"})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
-    app.run(host='0.0.0.0', port=port, debug=False) 
+    app.run(host='0.0.0.0', port=port) 

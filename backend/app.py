@@ -9,18 +9,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # Configure CORS with specific origins
-CORS(app, resources={
-    r"/*": {
-        "origins": [
-            "http://localhost:5173",
-            "https://bagnedinesh.github.io",
-            "https://bagnedinesh.github.io/loan-calculator"
-        ],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"],
-        "supports_credentials": False
-    }
-})
+CORS(app)  # Allow all origins for debugging
 
 def calculate_loan(loan_amount, tenure_months, interest_rate, part_payments=None, increased_emis=None):
     # 1. Setup

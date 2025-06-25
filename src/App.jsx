@@ -18,6 +18,10 @@ function App() {
   const [error, setError] = useState(null)
   const [results, setResults] = useState(null)
 
+  // Add state for new part payment and EMI increase input rows
+  const [newPartPayment, setNewPartPayment] = useState({ month: '', amount: '' });
+  const [newEmiIncrease, setNewEmiIncrease] = useState({ month: '', amount: '' });
+
   const resetCalculation = () => {
     setResults(null)
     setError(null)
@@ -61,7 +65,12 @@ function App() {
     performCalculation([], [])
   }
 
-  const handleAddPartPayment = () => setPartPayments([...partPayments, { month: '', amount: '' }])
+  const handleAddPartPayment = () => {
+    if (!newPartPayment.month || !newPartPayment.amount) return;
+    setPartPayments([...partPayments, { ...newPartPayment }]);
+    setNewPartPayment({ month: '', amount: '' });
+    recalculate([...partPayments, { ...newPartPayment }], increasedEmis);
+  };
   const handleDeletePartPayment = (index) => {
     const newPartPayments = partPayments.filter((_, i) => i !== index)
     setPartPayments(newPartPayments)
@@ -73,7 +82,12 @@ function App() {
     recalculate(newPartPayments, increasedEmis)
   }
 
-  const handleAddIncreasedEmi = () => setIncreasedEmis([...increasedEmis, { month: '', amount: '' }])
+  const handleAddIncreasedEmi = () => {
+    if (!newEmiIncrease.month || !newEmiIncrease.amount) return;
+    setIncreasedEmis([...increasedEmis, { ...newEmiIncrease }]);
+    setNewEmiIncrease({ month: '', amount: '' });
+    recalculate(partPayments, [...increasedEmis, { ...newEmiIncrease }]);
+  };
   const handleDeleteIncreasedEmi = (index) => {
     const newIncreasedEmis = increasedEmis.filter((_, i) => i !== index)
     setIncreasedEmis(newIncreasedEmis)
@@ -156,73 +170,103 @@ function App() {
             <div className="part-payments">
               <h3>Part Payments</h3>
               {partPayments.map((payment, index) => (
-                <div key={index} className="input-group">
-                  <div>
-                    <input
-                      type="number"
-                      value={payment.month}
-                      onChange={(e) => { handlePartPaymentChange(index, 'month', e.target.value); recalculate([...partPayments.map((p, i) => (i === index ? { ...p, month: e.target.value } : p))], increasedEmis); }}
-                      placeholder="Month"
-                      min="1"
-                      max={tenureMonths}
-                    />
-                    <input
-                      type="number"
-                      value={payment.amount}
-                      onChange={(e) => { handlePartPaymentChange(index, 'amount', e.target.value); recalculate([...partPayments.map((p, i) => (i === index ? { ...p, amount: e.target.value } : p))], increasedEmis); }}
-                      placeholder="Amount"
-                      min="0"
-                    />
-                    <button
-                      type="button"
-                      className="delete-btn"
-                      onClick={() => handleDeletePartPayment(index)}
-                      title="Delete part payment"
-                    >
-                      ×
-                    </button>
-                  </div>
+                <div key={index} className="payment-row">
+                  <input
+                    type="number"
+                    value={payment.month}
+                    onChange={(e) => handlePartPaymentChange(index, 'month', e.target.value)}
+                    placeholder="Month"
+                    min="1"
+                    max={tenureMonths}
+                  />
+                  <input
+                    type="number"
+                    value={payment.amount}
+                    onChange={(e) => handlePartPaymentChange(index, 'amount', e.target.value)}
+                    placeholder="Amount"
+                    min="0"
+                  />
+                  <button
+                    type="button"
+                    className="delete-btn"
+                    onClick={() => handleDeletePartPayment(index)}
+                    title="Delete part payment"
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
-              <button type="button" className="add-payment-btn" onClick={handleAddPartPayment}>
-                Add Part Payment
-              </button>
+              <div className="payment-row">
+                <input
+                  type="number"
+                  value={newPartPayment.month}
+                  onChange={(e) => setNewPartPayment({ ...newPartPayment, month: e.target.value })}
+                  placeholder="Month"
+                  min="1"
+                  max={tenureMonths}
+                />
+                <input
+                  type="number"
+                  value={newPartPayment.amount}
+                  onChange={(e) => setNewPartPayment({ ...newPartPayment, amount: e.target.value })}
+                  placeholder="Amount"
+                  min="0"
+                />
+                <button type="button" className="add-payment-btn" onClick={handleAddPartPayment}>
+                  Add
+                </button>
+              </div>
             </div>
 
             <div className="emi-increases">
               <h3>EMI Increases</h3>
               {increasedEmis.map((increase, index) => (
-                <div key={index} className="input-group">
-                  <div>
-                    <input
-                      type="number"
-                      value={increase.month}
-                      onChange={(e) => { handleIncreasedEmiChange(index, 'month', e.target.value); recalculate(partPayments, [...increasedEmis.map((em, i) => (i === index ? { ...em, month: e.target.value } : em))]); }}
-                      placeholder="Month"
-                      min="1"
-                      max={tenureMonths}
-                    />
-                    <input
-                      type="number"
-                      value={increase.amount}
-                      onChange={(e) => { handleIncreasedEmiChange(index, 'amount', e.target.value); recalculate(partPayments, [...increasedEmis.map((em, i) => (i === index ? { ...em, amount: e.target.value } : em))]); }}
-                      placeholder="Amount"
-                      min="0"
-                    />
-                    <button
-                      type="button"
-                      className="delete-btn"
-                      onClick={() => handleDeleteIncreasedEmi(index)}
-                      title="Delete EMI increase"
-                    >
-                      ×
-                    </button>
-                  </div>
+                <div key={index} className="emi-row">
+                  <input
+                    type="number"
+                    value={increase.month}
+                    onChange={(e) => handleIncreasedEmiChange(index, 'month', e.target.value)}
+                    placeholder="Month"
+                    min="1"
+                    max={tenureMonths}
+                  />
+                  <input
+                    type="number"
+                    value={increase.amount}
+                    onChange={(e) => handleIncreasedEmiChange(index, 'amount', e.target.value)}
+                    placeholder="Amount"
+                    min="0"
+                  />
+                  <button
+                    type="button"
+                    className="delete-btn"
+                    onClick={() => handleDeleteIncreasedEmi(index)}
+                    title="Delete EMI increase"
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
-              <button type="button" className="add-payment-btn" onClick={handleAddIncreasedEmi}>
-                Add EMI Increase
-              </button>
+              <div className="emi-row">
+                <input
+                  type="number"
+                  value={newEmiIncrease.month}
+                  onChange={(e) => setNewEmiIncrease({ ...newEmiIncrease, month: e.target.value })}
+                  placeholder="Month"
+                  min="1"
+                  max={tenureMonths}
+                />
+                <input
+                  type="number"
+                  value={newEmiIncrease.amount}
+                  onChange={(e) => setNewEmiIncrease({ ...newEmiIncrease, amount: e.target.value })}
+                  placeholder="Amount"
+                  min="0"
+                />
+                <button type="button" className="add-emi-btn" onClick={handleAddIncreasedEmi}>
+                  Add
+                </button>
+              </div>
             </div>
           </div>
 

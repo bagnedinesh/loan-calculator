@@ -22,77 +22,76 @@ CORS(app, resources={
 })
 
 def calculate_loan(loan_amount, tenure_months, interest_rate, part_payments=None, increased_emis=None):
-    # Convert annual interest rate to monthly
+    # 1. Setup
     monthly_rate = interest_rate / (12 * 100)
-    
-    # Calculate base EMI
-    base_emi = loan_amount * monthly_rate * math.pow(1 + monthly_rate, tenure_months) / (math.pow(1 + monthly_rate, tenure_months) - 1)
-    
-    # Initialize variables
-    balance = loan_amount
+    try:
+        base_emi = (loan_amount * monthly_rate * math.pow(1 + monthly_rate, tenure_months)) / (math.pow(1 + monthly_rate, tenure_months) - 1)
+        original_total_interest = (base_emi * tenure_months) - loan_amount
+    except ZeroDivisionError:
+        base_emi = 0
+        original_total_interest = 0
+
+    balance = float(loan_amount)
     schedule = []
-    total_interest = 0
-    total_amount = 0
-    part_payments = part_payments or []
-    increased_emis = increased_emis or []
+    total_interest_paid = 0.0
     
-    # Create a dictionary of part payments and increased EMIs for easy lookup
-    part_payment_dict = {pp['month']: pp['amount'] for pp in part_payments}
-    increased_emi_dict = {ee['month']: ee['amount'] for ee in increased_emis}
+    part_payment_dict = {int(pp['month']): float(pp['amount']) for pp in part_payments or [] if pp.get('month') and pp.get('amount')}
+    increased_emi_dict = {int(ee['month']): float(ee['amount']) for ee in increased_emis or [] if ee.get('month') and ee.get('amount')}
     
-    # Calculate schedule
+    # 2. Calculation Loop
     month = 1
-    while month <= tenure_months and balance > 0:
-        # Calculate interest for this month
-        interest_paid = balance * monthly_rate
+    while balance > 0.01 and month <= tenure_months * 2: # Allow for extended tenure
+        interest_this_month = balance * monthly_rate
         
-        # Get EMI for this month (base EMI + any increases from previous months)
         current_emi = base_emi
         for start_month, increase_amount in increased_emi_dict.items():
             if month >= start_month:
                 current_emi += increase_amount
         
-        # Calculate principal paid
-        principal_paid = current_emi - interest_paid
+        principal_from_emi = current_emi - interest_this_month
         
-        # Add part payment if any
-        if month in part_payment_dict:
-            principal_paid += part_payment_dict[month]
+        part_payment = part_payment_dict.get(month, 0)
         
-        # Update balance
-        balance -= principal_paid
+        # Total principal available to be paid this month
+        total_principal_to_pay = principal_from_emi + part_payment
         
-        # If balance becomes negative, adjust principal paid
-        if balance < 0:
-            principal_paid += balance
-            balance = 0
+        # Determine the actual payment
+        if balance <= total_principal_to_pay:
+            # This is the final payment
+            principal_paid = balance
+            total_payment_this_month = balance + interest_this_month
+            balance = 0.0
+        else:
+            # This is a regular payment
+            principal_paid = total_principal_to_pay
+            total_payment_this_month = current_emi + part_payment
+            balance -= principal_paid
+            
+        total_interest_paid += interest_this_month
         
-        # Calculate total payment for this month
-        total_payment = principal_paid + interest_paid
-        
-        # Update totals
-        total_interest += interest_paid
-        total_amount += total_payment
-        
-        # Add to schedule
         schedule.append({
             'month': month,
-            'emi': round(current_emi, 2),
-            'principal_paid': round(principal_paid, 2),
-            'interest_paid': round(interest_paid, 2),
-            'total_payment': round(total_payment, 2),
-            'balance': round(balance, 2)
+            'emi': round(total_payment_this_month, 2),
+            'principal': round(principal_paid, 2),
+            'interest': round(interest_this_month, 2),
+            'remaining': round(balance, 2)
         })
-        
         month += 1
-    
+
+    # 3. Final calculations
+    tenure_reduction = tenure_months - len(schedule)
+    interest_saved = original_total_interest - total_interest_paid
+    total_amount_paid = sum(item['emi'] for item in schedule)
+
     return {
         'base_emi': round(base_emi, 2),
         'schedule': schedule,
-        'total_interest': round(total_interest, 2),
-        'total_amount': round(total_amount, 2),
+        'total_interest': round(total_interest_paid, 2),
+        'total_amount': round(total_amount_paid, 2),
         'original_loan_amount': round(loan_amount, 2),
-        'actual_tenure': len(schedule)
+        'actual_tenure': len(schedule),
+        'tenure_reduction': tenure_reduction if tenure_reduction > 0 else 0,
+        'interest_saved': round(interest_saved, 2) if interest_saved > 0 else 0
     }
 
 @app.route('/calculate', methods=['POST', 'OPTIONS'])
@@ -108,69 +107,30 @@ def calculate_emi():
         # Extract values with defaults
         loan_amount = float(data.get('loanAmount', 0))
         interest_rate = float(data.get('interestRate', 0))
-        loan_term = int(data.get('loanTerm', 0))
+        tenure_months = int(data.get('loanTerm', 0))
         part_payments = data.get('partPayments', [])
-        emi_increases = data.get('emiIncreases', [])
+        increased_emis = data.get('emiIncreases', [])
 
         # Validate inputs
-        if loan_amount <= 0 or interest_rate <= 0 or loan_term <= 0:
+        if loan_amount <= 0 or interest_rate <= 0 or tenure_months <= 0:
             return jsonify({"error": "Invalid input values"}), 400
 
-        # Calculate monthly interest rate
-        monthly_rate = interest_rate / 12 / 100
-
-        # Calculate base EMI
-        base_emi = loan_amount * monthly_rate * (1 + monthly_rate)**loan_term / ((1 + monthly_rate)**loan_term - 1)
-
-        # Initialize variables for tracking
-        remaining_principal = loan_amount
-        total_interest = 0
-        total_paid = 0
-        current_emi = base_emi
-        schedule = []
-
-        # Process each month
-        for month in range(1, loan_term + 1):
-            # Calculate interest for this month
-            interest_payment = remaining_principal * monthly_rate
-            
-            # Calculate principal payment
-            principal_payment = current_emi - interest_payment
-            
-            # Check for part payments in this month
-            part_payment = 0
-            for payment in part_payments:
-                if payment['month'] == month:
-                    part_payment += float(payment['amount'])
-            
-            # Check for EMI increases in this month
-            for increase in emi_increases:
-                if increase['month'] == month:
-                    current_emi += float(increase['amount'])
-            
-            # Update principal payment with part payment
-            principal_payment += part_payment
-            
-            # Update totals
-            remaining_principal -= principal_payment
-            total_interest += interest_payment
-            total_paid += principal_payment + interest_payment
-            
-            # Add to schedule
-            schedule.append({
-                'month': month,
-                'emi': round(current_emi, 2),
-                'principal': round(principal_payment, 2),
-                'interest': round(interest_payment, 2),
-                'remaining': round(remaining_principal, 2) if remaining_principal > 0 else 0
-            })
-
-        return jsonify({
-            'base_emi': round(base_emi, 2),
-            'total_interest': round(total_interest, 2),
-            'total_payment': round(total_paid, 2),
-            'schedule': schedule
-        })
+        # Use the calculate_loan function
+        result = calculate_loan(loan_amount, tenure_months, interest_rate, part_payments, increased_emis)
+        
+        # Ensure all expected fields are present with correct names
+        response_data = {
+            'base_emi': result.get('base_emi', 0),
+            'total_interest': result.get('total_interest', 0),
+            'total_amount': result.get('total_amount', 0),
+            'original_loan_amount': result.get('original_loan_amount', loan_amount),
+            'actual_tenure': result.get('actual_tenure', tenure_months),
+            'tenure_reduction': result.get('tenure_reduction', 0),
+            'interest_saved': result.get('interest_saved', 0),
+            'schedule': result.get('schedule', [])
+        }
+        
+        return jsonify(response_data)
 
     except Exception as e:
         print(f"Error calculating EMI: {str(e)}")

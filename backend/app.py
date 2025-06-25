@@ -17,7 +17,8 @@ CORS(app, resources={
             "https://bagnedinesh.github.io/loan-calculator"
         ],
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
+        "allow_headers": ["Content-Type"],
+        "supports_credentials": False
     }
 })
 

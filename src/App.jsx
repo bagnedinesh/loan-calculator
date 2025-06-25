@@ -1,9 +1,8 @@
 import { useState, useCallback } from 'react'
 import './App.css'
 
-const API_URL = import.meta.env.PROD 
-  ? 'https://loan-calculator-backend.onrender.com'
-  : 'http://127.0.0.1:8000';
+// Use the deployed Render backend URL
+const API_URL = 'https://loan-calculator-backend-4wxp.onrender.com';
 
 function App() {
   // Input state
@@ -162,8 +161,7 @@ function App() {
                     <input
                       type="number"
                       value={payment.month}
-                      onChange={(e) => handlePartPaymentChange(index, 'month', e.target.value)}
-                      onKeyDown={(e) => handleKeyDown('partPayment', index, 'month', e.target.value)}
+                      onChange={(e) => { handlePartPaymentChange(index, 'month', e.target.value); recalculate([...partPayments.map((p, i) => (i === index ? { ...p, month: e.target.value } : p))], increasedEmis); }}
                       placeholder="Month"
                       min="1"
                       max={tenureMonths}
@@ -171,8 +169,7 @@ function App() {
                     <input
                       type="number"
                       value={payment.amount}
-                      onChange={(e) => handlePartPaymentChange(index, 'amount', e.target.value)}
-                      onKeyDown={(e) => handleKeyDown('partPayment', index, 'amount', e.target.value)}
+                      onChange={(e) => { handlePartPaymentChange(index, 'amount', e.target.value); recalculate([...partPayments.map((p, i) => (i === index ? { ...p, amount: e.target.value } : p))], increasedEmis); }}
                       placeholder="Amount"
                       min="0"
                     />
@@ -200,8 +197,7 @@ function App() {
                     <input
                       type="number"
                       value={increase.month}
-                      onChange={(e) => handleIncreasedEmiChange(index, 'month', e.target.value)}
-                      onKeyDown={(e) => handleKeyDown('emiIncrease', index, 'month', e.target.value)}
+                      onChange={(e) => { handleIncreasedEmiChange(index, 'month', e.target.value); recalculate(partPayments, [...increasedEmis.map((em, i) => (i === index ? { ...em, month: e.target.value } : em))]); }}
                       placeholder="Month"
                       min="1"
                       max={tenureMonths}
@@ -209,8 +205,7 @@ function App() {
                     <input
                       type="number"
                       value={increase.amount}
-                      onChange={(e) => handleIncreasedEmiChange(index, 'amount', e.target.value)}
-                      onKeyDown={(e) => handleKeyDown('emiIncrease', index, 'amount', e.target.value)}
+                      onChange={(e) => { handleIncreasedEmiChange(index, 'amount', e.target.value); recalculate(partPayments, [...increasedEmis.map((em, i) => (i === index ? { ...em, amount: e.target.value } : em))]); }}
                       placeholder="Amount"
                       min="0"
                     />

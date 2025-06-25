@@ -1,64 +1,25 @@
-# Loan Calculator Application
+# Loan Calculator Backend
 
-A web application for calculating loan EMI with support for part payments and EMI increases.
+Flask API backend for the loan calculator application.
 
 ## Features
 
-- Calculate EMI for loans
-- Support for part payments
-- EMI increase functionality
-- Real-time validation
+- EMI calculation with part payments
+- EMI increases functionality
+- Interest saved and tenure reduction calculations
 - Detailed payment schedule
-- Summary of loan details
+- Real-time calculations
 
-## Tech Stack
+## Deployment
 
-- Frontend: React.js with Vite
-- Backend: Python Flask
-- Styling: CSS
-
-## Setup Instructions
-
-### Backend Setup
-
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-
-2. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Run the Flask server:
-   ```bash
-   python app.py
-   ```
-
-### Frontend Setup
-
-1. Install Node.js dependencies:
-   ```bash
-   npm install
-   ```
-
-2. Start the development server:
-   ```bash
-   npm run dev
-   ```
+This backend is designed to be deployed on Railway.
 
 ## API Endpoints
 
-- POST `/calculate`: Calculate loan EMI and payment schedule
-  - Request body: JSON with loan details
-  - Response: JSON with calculation results
+- `POST /calculate` - Calculate loan EMI and schedule
+- `GET /health` - Health check endpoint
+- `GET /` - API status
 
-## Development
+## Environment Variables
 
-- Backend runs on: http://localhost:8000
-- Frontend runs on: http://localhost:5173
-
-## License
-
-MIT
+- `PORT` - Port number (Railway sets this automatically)
